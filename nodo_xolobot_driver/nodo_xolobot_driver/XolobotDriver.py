@@ -1,4 +1,5 @@
 
+import argparse
 from math import sqrt
 from enum import Enum
 import rclpy
@@ -28,7 +29,7 @@ Estado = Enum('Estado', 'wandering go2Sun go2Water holdon rechargin rechargeWate
 
 # Class that implements the driver that controls Xolobot. 
 # It receives environment stimuli and produces the values for the actuators (robot velocities)
-class XolobotDriver(Node):
+class XolobotDriver(Node, id):
 
     def __init__(self):
         self.manejaUsuario = False
@@ -56,13 +57,13 @@ class XolobotDriver(Node):
             self.get_logger().info('Estación de riego no responde, esperando...')
 
         # Fuente para publicar comandos de velocidad a Xolobot.
-        self.pubVelocities = self.create_publisher(Twist, '/model/arlo_xolobot/cmd_vel', 10)
+        self.pubVelocities = self.create_publisher(Twist, f'/model/arlo_xolobot{id}/cmd_vel', 10)
 
         # Fuente para publicar el estado de Xolobot
         self.pubState = self.create_publisher(String, '/xolobot_state', 10)
 
         # Suscripción a la información de posición y orientación del robot.
-        self.subsOdom = self.create_subscription(Odometry, '/model/arlo_xolobot/gz_odometry', self.updatePosition, 10)
+        self.subsOdom = self.create_subscription(Odometry, f'/model/arlo_xolobot{id}/gz_odometry', self.updatePosition, 10)
 
         # Suscripción a la información de posición de la estación de riego.
         self.subsRiego = self.create_subscription(Odometry, '/watering_station/odom', self.updatePosRiego, 2)
@@ -412,18 +413,33 @@ class XolobotDriver(Node):
 
 
 def main(args=None):
+    parser = argparse.ArgumentParser(description='Xolobot Driver id')
+    parser.add_argument('id', type=int, help='Id del robot', required=True)
+    args = parser.parse_args()
+
     rclpy.init(args=args)
 
-    xolobot_drv = XolobotDriver()
-    xolobot_drv.drive()
+    try:
+        xolobot_drv = XolobotDriver(args.id)
+        xolobot_drv.drive()
+    except KeyboardInterrupt:
+        print("Cerrando nodos")
+        xolobot_drv.destroy_node()
+    except:
+        print("Error en el driver")
+        xolobot_drv.destroy_node()
+    finally:
+        xolobot_drv.destroy_node()
+        print("Cerrando nodos")
 
     #rclpy.spin(xolobot_drv)
 
     # Destroy the node explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    xolobot_drv.destroy_node()
-    rclpy.shutdown()
+    # xolobot_drv.destroy_node()
+    # xolobot_drv1.destroy_node()
+    # rclpy.shutdown()
 
 
 if __name__ == '__main__':
