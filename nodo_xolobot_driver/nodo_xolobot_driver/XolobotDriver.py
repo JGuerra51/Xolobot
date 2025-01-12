@@ -27,17 +27,22 @@ from station_interface.srv import Reload
 # el robot: wandering (vagar), go2goal (ir a objetivo), holdon (esperar), refill (repostando agua/luz)
 Estado = Enum('Estado', 'wandering go2Sun go2Water holdon rechargin rechargeWater rechargeLight')
 
+xolobot_id = 0
+
 # Class that implements the driver that controls Xolobot. 
 # It receives environment stimuli and produces the values for the actuators (robot velocities)
-class XolobotDriver(Node, id):
+class XolobotDriver(Node):
 
-    def __init__(self):
+    def __init__(self, xolobot_id=''):
         self.manejaUsuario = False
-
         super().__init__('xolobot_driver')
+
+        self.xolobot_id = xolobot_id
 
         # Contador para imprimir mensajes solamente cierto número de iteraciones.
         self.i = 0
+
+        print(f'Iniciando nodo Xolobot Driver con id:{xolobot_id}')
 
         #self.susJoy = self.create_subscription(Joy, '/joy', self.checkHand, 1)
 
@@ -57,13 +62,13 @@ class XolobotDriver(Node, id):
             self.get_logger().info('Estación de riego no responde, esperando...')
 
         # Fuente para publicar comandos de velocidad a Xolobot.
-        self.pubVelocities = self.create_publisher(Twist, f'/model/arlo_xolobot{id}/cmd_vel', 10)
+        self.pubVelocities = self.create_publisher(Twist, f'/model/arlo_xolobot{xolobot_id}/cmd_vel', 10)
 
         # Fuente para publicar el estado de Xolobot
         self.pubState = self.create_publisher(String, '/xolobot_state', 10)
 
         # Suscripción a la información de posición y orientación del robot.
-        self.subsOdom = self.create_subscription(Odometry, f'/model/arlo_xolobot{id}/gz_odometry', self.updatePosition, 10)
+        self.subsOdom = self.create_subscription(Odometry, f'/model/arlo_xolobot{xolobot_id}/gz_odometry', self.updatePosition, 10)
 
         # Suscripción a la información de posición de la estación de riego.
         self.subsRiego = self.create_subscription(Odometry, '/watering_station/odom', self.updatePosRiego, 2)
@@ -120,7 +125,6 @@ class XolobotDriver(Node, id):
         self.wanderingStraight = True
 
         #self.fileVelocities = ""
-
 
     ## Este es el método principal donde le indicamos a Xolobot cómo moverse 
     ## según su estado: wandering, go2goal, holdon, etc.
@@ -414,13 +418,19 @@ class XolobotDriver(Node, id):
 
 def main(args=None):
     parser = argparse.ArgumentParser(description='Xolobot Driver id')
-    parser.add_argument('id', type=int, help='Id del robot', required=True)
-    args = parser.parse_args()
+    parser.add_argument('id', type=int)
+    args_id = parser.parse_args()
+    currend_id = args_id.id
+    print("ID: %d" % currend_id)
 
     rclpy.init(args=args)
 
     try:
-        xolobot_drv = XolobotDriver(args.id)
+        if currend_id == 1:
+            xolobot_drv = XolobotDriver()
+        else:
+            xolobot_drv = XolobotDriver(xolobot_id=currend_id)
+        
         xolobot_drv.drive()
     except KeyboardInterrupt:
         print("Cerrando nodos")
