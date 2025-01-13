@@ -27,15 +27,13 @@ from station_interface.srv import Reload
 # el robot: wandering (vagar), go2goal (ir a objetivo), holdon (esperar), refill (repostando agua/luz)
 Estado = Enum('Estado', 'wandering go2Sun go2Water holdon rechargin rechargeWater rechargeLight')
 
-xolobot_id = 0
-
 # Class that implements the driver that controls Xolobot. 
 # It receives environment stimuli and produces the values for the actuators (robot velocities)
 class XolobotDriver(Node):
 
     def __init__(self, xolobot_id=''):
         self.manejaUsuario = False
-        super().__init__('xolobot_driver')
+        super().__init__(f'xolobot_driver_{xolobot_id}')
 
         self.xolobot_id = xolobot_id
 
@@ -43,6 +41,7 @@ class XolobotDriver(Node):
         self.i = 0
 
         print(f'Iniciando nodo Xolobot Driver con id:{xolobot_id}')
+        print(f'/model/arlo_xolobot{xolobot_id}/cmd_vel')
 
         #self.susJoy = self.create_subscription(Joy, '/joy', self.checkHand, 1)
 
@@ -52,9 +51,9 @@ class XolobotDriver(Node):
         ###############
 
         # Stub del cliente para invocar el servicio de la estación de iluminación.
-        self.clientLight = self.create_client(Reload, 'recharge_light')      
-        while not self.clientLight.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Estación de iluminación no responde, esperando...')
+        # self.clientLight = self.create_client(Reload, 'recharge_light')      
+        # while not self.clientLight.wait_for_service(timeout_sec=1.0):
+        #     self.get_logger().info('Estación de iluminación no responde, esperando...')
 
         # Stub del cliente para invocar el servicio de la estación de riego.
         self.clientWater = self.create_client(Reload, 'recharge_water')       
@@ -77,10 +76,10 @@ class XolobotDriver(Node):
         self.subsSol   = self.create_subscription(Odometry, '/light_station/odom', self.updatePosSol, 2)
 
         # Suscripción al tópico /riego que le ordena al robot ir a la estación de riego.
-        self.subsRiego = self.create_subscription(String, '/riego', self.checkWatering, 10)
+        self.subsRiego = self.create_subscription(String, f'/riego{xolobot_id}', self.checkWatering, 10)
 
         # Suscripción al tópico /sol que le ordena al robot ir a la estación de iluminación.
-        self.subsSun = self.create_subscription(String, '/sol', self.checkSun, 10)
+        # self.subsSun = self.create_subscription(String, f'/sol{xolobot_id}', self.checkSun, 10)
 
         # Suscripción al tópico /avanzar que le ordena al robot volver a moverse.
         self.subsAvanzar = self.create_subscription(String, '/avanzar', self.checkAvanzar, 10)

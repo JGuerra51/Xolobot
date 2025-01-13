@@ -92,9 +92,9 @@ class MinimalSubscriber(Node):
                 self.riego_publisher.publish(String(data=str(average)))  # Publicar el promedio en el tópico 'riego'
                 self.get_logger().info('\nPromedio de humedad enviado a riego: "%f"\n' % average)
                 if self.audioNumber == 0:
-                    playsound("tengo_mucha_sed_m11.mp3")  # Reproducir el archivo de audio
+                    playsound("src/nodo_data_analysis/nodo_data_analysis/tengo_mucha_sed_m11.mp3")  # Reproducir el archivo de audio
                 elif self.audioNumber == 1:
-                    playsound("tengo_sed_m11.mp3")
+                    playsound("src/nodo_data_analysis/nodo_data_analysis/tengo_sed_m11.mp3")
 
                 self.audioNumber = (self.audioNumber+1) % self.numAudioFiles
             self.humidity_data.clear()  # Limpiar la lista de datos de humedad
