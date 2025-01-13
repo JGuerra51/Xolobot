@@ -97,7 +97,7 @@
     </model>
 
     <!-- Descripcion del primer robot -->
-    <model name="arlo_xolobot">
+    <model name="arlo_xolobot1">
       <self_collide>false</self_collide>
       <include merge="true">
         <uri>package://xolobot_blueprint/models/arlodrive</uri>
@@ -124,10 +124,10 @@
       <plugin
         filename="libignition-gazebo-odometry-publisher-system.so"
         name="ignition::gazebo::systems::OdometryPublisher">
-        <odom_frame>arlo_xolobot/odom</odom_frame>
-        <robot_base_frame>arlo_xolobot</robot_base_frame>
+        <odom_frame>arlo_xolobot1/odom</odom_frame>
+        <robot_base_frame>arlo_xolobot1</robot_base_frame>
         <odom_publish_frequency>20</odom_publish_frequency>
-        <odom_topic>/arlo_xolobot/odom</odom_topic>
+        <odom_topic>/arlo_xolobot1/odom</odom_topic>
       </plugin>
     </model>
 

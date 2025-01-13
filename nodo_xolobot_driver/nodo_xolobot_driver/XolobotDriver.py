@@ -426,11 +426,7 @@ def main(args=None):
     rclpy.init(args=args)
 
     try:
-        if currend_id == 1:
-            xolobot_drv = XolobotDriver()
-        else:
-            xolobot_drv = XolobotDriver(xolobot_id=currend_id)
-        
+        xolobot_drv = XolobotDriver(xolobot_id=currend_id)
         xolobot_drv.drive()
     except KeyboardInterrupt:
         print("Cerrando nodos")
