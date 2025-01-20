@@ -11,21 +11,21 @@ period = 0.5
 
 class PlantPubSub(Node):
     
-    def __init__(self):
-        super().__init__('Plant_PubSub')
+    def __init__(self, plantID, tiempoHumedad = 2.5):
+        super().__init__('Plant_PubSub' + str(plantID))
         #Plublicadores
-        self.publisher_humedad = self.create_publisher(Measure, '/humedad', 10)
-        self.publisher_temp = self.create_publisher(Measure, '/temperatura', 10)
+        self.publisher_humedad = self.create_publisher(Measure, '/humedad' + str(plantID), 10)
+        self.publisher_temp = self.create_publisher(Measure, '/temperatura' + str(plantID), 10)
         timer_period = period
-        self.time_h = 2.5 #diferente a time.t para evitar traslape 
+        self.time_h = tiempoHumedad #diferente a time.t para evitar traslape 
         self.time_t = 1.0
         self.time = 1.0
         self.timer = self.create_timer(timer_period, self.timer_callback)
         
         #suscriptores
-        self.subscription_h = self.create_subscription(String,'/planta_regada', self.listener_callback, 10)
+        self.subscription_h = self.create_subscription(String,'/planta_regada' + str(plantID), self.listener_callback, 10)
         self.subscription_h  # prevent unused variable warning
-        self.subscription_t = self.create_subscription(String,'/avanzar', self.listener_callback, 10)
+        self.subscription_t = self.create_subscription(String,'/avanzar' + str(plantID), self.listener_callback, 10)
         self.subscription_t # prevent unused variable warning
 
     #publica periodicamente el valor de ambos topicos
@@ -73,7 +73,10 @@ class PlantPubSub(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    Plant_PubSub = PlantPubSub()
+    id = int(sys.argv[1])
+    tiempoHumedad = float(sys.argv[2])          
+
+    Plant_PubSub = PlantPubSub(id, tiempoHumedad)
     rclpy.spin(Plant_PubSub)
 
     Plant_PubSub.destroy_node()
