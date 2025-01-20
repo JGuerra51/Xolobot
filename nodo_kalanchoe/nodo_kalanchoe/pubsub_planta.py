@@ -23,9 +23,9 @@ class PlantPubSub(Node):
         self.timer = self.create_timer(timer_period, self.timer_callback)
         
         #suscriptores
-        self.subscription_h = self.create_subscription(String,'/planta_regada' + str(plantID), self.listener_callback, 10)
+        self.subscription_h = self.create_subscription(String,f'/planta_regada{plantID}', self.listener_callback, 10)
         self.subscription_h  # prevent unused variable warning
-        self.subscription_t = self.create_subscription(String,'/avanzar' + str(plantID), self.listener_callback, 10)
+        self.subscription_t = self.create_subscription(String,f'/avanzar{plantID}', self.listener_callback, 10)
         self.subscription_t # prevent unused variable warning
 
     #publica periodicamente el valor de ambos topicos

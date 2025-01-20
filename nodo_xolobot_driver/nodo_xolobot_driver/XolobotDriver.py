@@ -81,10 +81,10 @@ class XolobotDriver(Node):
         self.subsSol   = self.create_subscription(Odometry, '/light_station/odom', self.updatePosSol, 2)
 
         # Suscripción al tópico /riego que le ordena al robot ir a la estación de riego.
-        self.subsRiego = self.create_subscription(String, '/riego', self.checkWatering, 10)
+        self.subsRiego = self.create_subscription(String, f'/riego{self.xolobot_id}', self.checkWatering, 10)
 
         # Suscripción al tópico /sol que le ordena al robot ir a la estación de iluminación.
-        self.subsSun = self.create_subscription(String, '/sol', self.checkSun, 10)
+        # self.subsSun = self.create_subscription(String, '/sol', self.checkSun, 10)
 
         # Suscripción al tópico /avanzar que le ordena al robot volver a moverse.
         self.subsAvanzar = self.create_subscription(String, '/avanzar', self.checkAvanzar, 10)
@@ -246,6 +246,7 @@ class XolobotDriver(Node):
 
         ## Esta llamada tomará algunos segundos porque está recargando agua.
         self.clientWater.call(request)
+        self.onWait = False
 
 
     def gotoGoal(self, goalPosition):
@@ -326,22 +327,23 @@ class XolobotDriver(Node):
     # del tópico /riego
     def checkWatering(self, msgRiego):
         print("Me llegó el mensaje '%s' para que vaya a la estación de Riego..." % msgRiego.data)
-        if self.estado == Estado.wandering and not self.onWait:
+
+        if self.onWait:
+            print("No hay agua disponible, estoy en la cola de espera...")
+            return
+
+        if self.estado == Estado.wandering:
             print('Verificando disponibilidad de agua...')
             request = Reload.Request()
             request.robot_id = int(self.xolobot_id)
-
+            
             future = self.water_request_client.call_async(request)
             future.add_done_callback(self.water_request_service)
-        if self.onWait:
-            print('No hay agua disponible, estoy en la cola de espera...')
-        if self.estado == Estado.go2Water:
-            print('Agua disponible, estoy llendo a recargar agua...')
-        if self.estado == Estado.rechargeWater:
-            print('Estoy recargando agua...')
+            return
 
     def water_request_service(self, future):
         try:
+            print(future)
             response = future.result()
             if response.success:
                 print('Agua disponible, voy a recargar agua...')
@@ -356,14 +358,13 @@ class XolobotDriver(Node):
     def onWaterAvailable(self, msg):
         if self.onWait:
             parts = msg.data.split(':')
+            print(parts)
             if len(parts) == 2:
                 robot_id = int(parts[1])
                 if robot_id == int(self.xolobot_id):
-                    print('Agua disponible para mí, voy a recargar agua...')
+                    print('Agua disponible, voy a recargar agua...')
                     self.estado = Estado.go2Water
                     self.pubState.publish(String(data="Buscando agua"))
-                else:
-                    print('Agua disponible para otro robot, esperando...')
 
     # Método que se invoca automáticamente cada que llega un mensaje
     # del tópico /sol

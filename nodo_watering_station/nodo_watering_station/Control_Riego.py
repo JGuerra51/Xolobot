@@ -40,7 +40,7 @@ class XolobotController(Node):
         self.pub_avanzar = self.create_publisher(String, '/avanzar', 10)
         
         # Publicador para el tópico /planta_regada
-        self.pub_planta_servida = self.create_publisher(String, '/planta_regada', 10)
+        # self.pub_planta_servida = self.create_publisher(String, '/planta_regada', 10)
         
         # Publicador para el tópico /niv_agua
         self.pub_nivel_agua = self.create_publisher(String, '/niv_agua', 10)
@@ -67,21 +67,20 @@ class XolobotController(Node):
         self.secondsEnergy = 0.1 # 1 segundo por 100 mililitros. 
 
     def queue_service(self, request, response):
-        # print(f'Robot {request.robot_id} solicita agua...')
         robot_id = int(request.robot_id)
 
-        if self.robot_queue == [] and self.current_watering_robot is None:
-            print(f'Robot {robot_id} primero en cola, permiso otorgado...')
+        if len(self.robot_queue) == 0:
+            print(f'Robot {robot_id} first on the queue')
             self.robot_queue.append(robot_id)
             response.success = True
             return response
-        elif robot_id not in self.robot_queue:
-            print(f'Robot {robot_id} agregado a la cola...')
-            self.robot_queue.append(robot_id)
+        if robot_id in self.robot_queue:
+            print(f'Robot {robot_id} already in the queue')
             response.success = False
             return response
-        else:
-            print(f'Robot {robot_id} ya está en la cola...')
+        if robot_id not in self.robot_queue:
+            print(f'Robot {robot_id} added to the queue')
+            self.robot_queue.append(robot_id)
             response.success = False
             return response
 
@@ -99,11 +98,12 @@ class XolobotController(Node):
         print("Recarga lista 🔋🔋")
 
         # Publicar mensaje en el tópico /planta_regada
+        pub_planta_servida = self.create_publisher(String, f'/planta_regada{self.current_watering_robot}', 10)
         planta_servida_msg = String()
-        planta_servida_msg.data = "planta_regada"
-        self.pub_planta_servida.publish(planta_servida_msg)
+        planta_servida_msg.data = 'planta_regada'
+        pub_planta_servida.publish(planta_servida_msg)
 
-        print(f'Robot {self.current_watering_robot}, planta regada...')
+        print(f'planta_servida_msg.data: {planta_servida_msg.data}')
 
         # Obtener el siguiente robot en la cola
         next_robot = None
@@ -116,9 +116,7 @@ class XolobotController(Node):
         water_available_msg = String()
         if next_robot is not None:
             water_available_msg.data = f'water_available:{next_robot}'
-        else:
-            water_available_msg.data = 'water_available'
-        self.pub_water_available.publish(water_available_msg)
+            self.pub_water_available.publish(water_available_msg)
         
         response.success = True
         return response
