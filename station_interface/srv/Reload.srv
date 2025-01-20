@@ -1,4 +1,5 @@
 float64 load
+int32 robot_id
 ---
 bool success
 float64 time

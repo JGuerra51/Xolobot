@@ -35,9 +35,11 @@ class XolobotDriver(Node):
 
     def __init__(self, xolobot_id=''):
         self.manejaUsuario = False
+        self.wandering_msg_printed = False
         super().__init__('xolobot_driver')
 
         self.xolobot_id = xolobot_id
+        self.onWait = False
 
         # Contador para imprimir mensajes solamente cierto número de iteraciones.
         self.i = 0
@@ -52,14 +54,16 @@ class XolobotDriver(Node):
         ###############
 
         # Stub del cliente para invocar el servicio de la estación de iluminación.
-        self.clientLight = self.create_client(Reload, 'recharge_light')      
-        while not self.clientLight.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Estación de iluminación no responde, esperando...')
+        # self.clientLight = self.create_client(Reload, 'recharge_light')      
+        # while not self.clientLight.wait_for_service(timeout_sec=1.0):
+        #     self.get_logger().info('Estación de iluminación no responde, esperando...')
 
         # Stub del cliente para invocar el servicio de la estación de riego.
         self.clientWater = self.create_client(Reload, 'recharge_water')       
         while not self.clientWater.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Estación de riego no responde, esperando...')
+
+        self.water_request_client = self.create_client(Reload, 'request_water')
 
         # Fuente para publicar comandos de velocidad a Xolobot.
         self.pubVelocities = self.create_publisher(Twist, f'/model/arlo_xolobot{xolobot_id}/cmd_vel', 10)
@@ -85,6 +89,7 @@ class XolobotDriver(Node):
         # Suscripción al tópico /avanzar que le ordena al robot volver a moverse.
         self.subsAvanzar = self.create_subscription(String, '/avanzar', self.checkAvanzar, 10)
 
+        self.waterAvailableSub = self.create_subscription(String, '/water_available', self.water_request_service, 10)
 
         #########
         ### Atributos del robot
@@ -172,7 +177,11 @@ class XolobotDriver(Node):
     # Método para que Xolobot tome una dirección para deambular.
     # Con probabilidad pequeña gira, y con probabilidad mayor sigue derecho.
     def wandering(self):
-        print("Buscando mariposas 🦋🦋🦋...")
+        if not self.wandering_msg_printed:
+            print("Buscando mariposas 🦋🦋🦋", end="")
+            self.wandering_msg_printed = True
+        else:
+            print(".", end="", flush=True)  #
 
         if self.manejaUsuario == True:
             print("\tEl usuario al mando 🎮🎮")
@@ -180,6 +189,8 @@ class XolobotDriver(Node):
             ## Con baja probabilidad cambiamos de dirección.
             if self.wanderingStraight:
                 if random() < 0.05:
+                    self.wandering_msg_printed = False
+                    print("\n")
                     print("Girar...")
                     self.wanderingStraight = False
                     if random() < 0.5:
@@ -188,6 +199,8 @@ class XolobotDriver(Node):
                         self.turnLeft()
             else:
                 if random() < 0.2:
+                    self.wandering_msg_printed = False
+                    print("\n")
                     print("Ir derecho")
                     self.wanderingStraight = True
                     self.goStraight()
@@ -209,6 +222,7 @@ class XolobotDriver(Node):
 
         # Después de recargar debe pasar otra vez a wandering.
         self.estado = Estado.wandering
+        self.wandering_msg_printed = False
         self.pubState.publish(String(data="Persiguiendo mariposas 🦋🦋"))
         print("Listo, vámonos 🪴🎊🎉")
 
@@ -228,6 +242,7 @@ class XolobotDriver(Node):
         self.pubState.publish(String(data="Recargando agua"))
         request = Reload.Request()
         request.load = 200.0
+        request.robot_id = int(self.xolobot_id)
 
         ## Esta llamada tomará algunos segundos porque está recargando agua.
         self.clientWater.call(request)
@@ -259,9 +274,9 @@ class XolobotDriver(Node):
             #3. Obtener el ángulo de desviación a la meta.
             deviationAngle = np.arctan2( np.sin(goalDir-robotDir), np.cos(goalDir-robotDir) )
 
-            print("\nRobot direction: %f" % ((robotDir*180.0) / np.pi))
-            print("Goal direction : %f" % ((goalDir*180.0) / np.pi))
-            print("Goal deviation : %f" % ((deviationAngle*180.0) / np.pi))
+            # print("\nRobot direction: %f" % ((robotDir*180.0) / np.pi))
+            # print("Goal direction : %f" % ((goalDir*180.0) / np.pi))
+            # print("Goal deviation : %f" % ((deviationAngle*180.0) / np.pi))
         
             #4. Corregir si es necesario la dirección actual del robot.
             vel_msg = Twist()
@@ -278,7 +293,7 @@ class XolobotDriver(Node):
             if self.manejaUsuario == True:
                 print("Usuario!! Tienes que llevar al robot a la ZONA")
             else:
-                print("Lin: %f, Ang: %f" % (vel_msg.linear.x, vel_msg.angular.z))
+                # print("Lin: %f, Ang: %f" % (vel_msg.linear.x, vel_msg.angular.z))
                 #5. Enviar la nueva orden de conducción a xolobot
 
                 #self.fileVelocities.write("%f\t%f\t%f\t%f\t%f\t%f\n" % (self.xoloPose.position.x, self.xoloPose.position.y, distToGo, vel_msg.linear.x, magDeviation, vel_msg.angular.z))
@@ -292,7 +307,7 @@ class XolobotDriver(Node):
         if self.i % 60 == 0:
             #self.get_logger().info('Orientación: z=%f, w=%f' % (odom.pose.pose.orientation.z, odom.pose.pose.orientation.w))
             robotDir = self.getRobotDirection(self.xoloPose.orientation)
-            print("\nRobot direction: %f" % ((robotDir*180.0) / np.pi))
+            # print("\nRobot direction: %f" % ((robotDir*180.0) / np.pi))
             #print("Yaw robot: %f" % (robotDir))
 
         self.i = self.i+1
@@ -311,13 +326,45 @@ class XolobotDriver(Node):
     # del tópico /riego
     def checkWatering(self, msgRiego):
         print("Me llegó el mensaje '%s' para que vaya a la estación de Riego..." % msgRiego.data)
-        if self.estado == Estado.wandering:
-            print("Voy a ir a la estación de riego 🚿")
-            self.estado = Estado.go2Water
-            self.pubState.publish(String(data="Buscando agua"))
-        else:
-            print("Ahora no puedo ir la estación de Riego, estoy en otra cosa ⛔️")
-        
+        if self.estado == Estado.wandering and not self.onWait:
+            print('Verificando disponibilidad de agua...')
+            request = Reload.Request()
+            request.robot_id = int(self.xolobot_id)
+
+            future = self.water_request_client.call_async(request)
+            future.add_done_callback(self.water_request_service)
+        if self.onWait:
+            print('No hay agua disponible, estoy en la cola de espera...')
+        if self.estado == Estado.go2Water:
+            print('Agua disponible, estoy llendo a recargar agua...')
+        if self.estado == Estado.rechargeWater:
+            print('Estoy recargando agua...')
+
+    def water_request_service(self, future):
+        try:
+            response = future.result()
+            if response.success:
+                print('Agua disponible, voy a recargar agua...')
+                self.estado = Estado.go2Water
+                self.pubState.publish(String(data="Buscando agua"))
+            else:
+                self.onWait = True
+                print('No hay agua disponible, estoy en la cola de espera...')
+        except Exception as e:
+            print('Error al verificar la disponibilidad de agua:', e)
+            
+    def onWaterAvailable(self, msg):
+        if self.onWait:
+            parts = msg.data.split(':')
+            if len(parts) == 2:
+                robot_id = int(parts[1])
+                if robot_id == int(self.xolobot_id):
+                    print('Agua disponible para mí, voy a recargar agua...')
+                    self.estado = Estado.go2Water
+                    self.pubState.publish(String(data="Buscando agua"))
+                else:
+                    print('Agua disponible para otro robot, esperando...')
+
     # Método que se invoca automáticamente cada que llega un mensaje
     # del tópico /sol
     def checkSun(self, msgSol):
@@ -426,11 +473,7 @@ def main(args=None):
     rclpy.init(args=args)
 
     try:
-        if currend_id == 1:
-            xolobot_drv = XolobotDriver()
-        else:
-            xolobot_drv = XolobotDriver(xolobot_id=currend_id)
-        
+        xolobot_drv = XolobotDriver(xolobot_id=currend_id)
         xolobot_drv.drive()
     except KeyboardInterrupt:
         print("Cerrando nodos")

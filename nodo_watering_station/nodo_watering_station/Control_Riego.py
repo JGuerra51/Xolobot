@@ -25,7 +25,16 @@ class XolobotController(Node):
     def __init__(self):
         super().__init__('water_controller')
 
+        self.robot_queue = []
+        self.current_watering_robot = None
+
         self.srvReload = self.create_service(Reload, 'recharge_water', self.watering_service) 
+
+        # Servicio para solicitud de agua
+        self.queue_srv = self.create_service(Reload, 'request_water', self.queue_service)
+
+        # Publicador para saber si hay agua disponible 
+        self.pub_water_available = self.create_publisher(String, '/water_available', 10)
 
         # Declaramos que vamos a publicar el mensaje para que ya pueda avanzar Xolobot.
         self.pub_avanzar = self.create_publisher(String, '/avanzar', 10)
@@ -57,12 +66,34 @@ class XolobotController(Node):
         
         self.secondsEnergy = 0.1 # 1 segundo por 100 mililitros. 
 
+    def queue_service(self, request, response):
+        # print(f'Robot {request.robot_id} solicita agua...')
+        robot_id = int(request.robot_id)
+
+        if self.robot_queue == [] and self.current_watering_robot is None:
+            print(f'Robot {robot_id} primero en cola, permiso otorgado...')
+            self.robot_queue.append(robot_id)
+            response.success = True
+            return response
+        elif robot_id not in self.robot_queue:
+            print(f'Robot {robot_id} agregado a la cola...')
+            self.robot_queue.append(robot_id)
+            response.success = False
+            return response
+        else:
+            print(f'Robot {robot_id} ya está en la cola...')
+            response.success = False
+            return response
 
     def watering_service(self, request, response):
-        print("Watering the plant 💦💦🪴...")
+        
+        # Recuperar el id del robot que está solicitando el agua 
+        self.current_watering_robot = int(request.robot_id)
+        print(f'Watering the plant of robot {self.current_watering_robot}💦💦🪴...')
 
         # Simula que la estación de iluminación está dando el servicio.
-        time.sleep(request.load * self.secondsEnergy)
+        # time.sleep(request.load * self.secondsEnergy)
+        time.sleep(2)
 
         # Cuando se cumple el tiempo, publicar al robot /avanzar para que pueda irse.
         print("Recarga lista 🔋🔋")
@@ -72,10 +103,25 @@ class XolobotController(Node):
         planta_servida_msg.data = "planta_regada"
         self.pub_planta_servida.publish(planta_servida_msg)
 
+        print(f'Robot {self.current_watering_robot}, planta regada...')
+
+        # Obtener el siguiente robot en la cola
+        next_robot = None
+        self.robot_queue.pop(0)
+        if len(self.robot_queue) > 0:
+            next_robot = self.robot_queue.pop(0)
+            
+        self.current_watering_robot = next_robot
+        # Publicar mensaje en el tópico /water_available para el siguiente robot
+        water_available_msg = String()
+        if next_robot is not None:
+            water_available_msg.data = f'water_available:{next_robot}'
+        else:
+            water_available_msg.data = 'water_available'
+        self.pub_water_available.publish(water_available_msg)
+        
         response.success = True
         return response
-
-
  
     ### FUNCIÓN IMPORTANTE ###
     # Esta función se invoca automáticamente cada que llega un mensaje 

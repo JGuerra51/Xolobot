@@ -1,0 +1,215 @@
+I'll help you create a queue service for managing multiple robots needing water. Here's how we can modify the code to implement this:
+
+First, let's add a queue to the class initialization:
+
+def __init__(self):
+    super().__init__('water_controller')
+    
+    # Add queue for robots
+    self.robot_queue = []
+    self.currently_serving = None
+    
+    # Create the queue service
+    self.queue_service = self.create_service(
+        Reload, 
+        'queue_watering', 
+        self.queue_service_callback
+    )
+    
+    # Keep existing services
+    self.srvReload = self.create_service(
+        Reload, 
+        'recharge_water', 
+        self.watering_service
+    )
+    # ... rest of your init code ...
+
+Copy
+
+Insert at cursor
+python
+Add the queue service callback:
+
+def queue_service_callback(self, request, response):
+    """
+    Service to handle queue requests from robots
+    """
+    robot_id = request.id
+    water_needed = request.load
+    
+    # Check if robot is already in queue
+    if robot_id in [robot['id'] for robot in self.robot_queue]:
+        self.get_logger().info(f'Robot {robot_id} is already in queue')
+        response.success = False
+        response.load = -1
+        return response
+    
+    # Add robot to queue
+    queue_position = len(self.robot_queue)
+    self.robot_queue.append({
+        'id': robot_id,
+        'water_needed': water_needed,
+        'timestamp': time.time()
+    })
+    
+    self.get_logger().info(f'Added robot {robot_id} to queue. Position: {queue_position + 1}')
+    
+    # Set response
+    response.success = True
+    response.load = queue_position
+    return response
+
+Copy
+
+Insert at cursor
+python
+Modify the watering service to handle the queue:
+
+def watering_service(self, request, response):
+    robot_id = request.id
+    
+    # Check if robot is next in queue
+    if not self.robot_queue or self.robot_queue[0]['id'] != robot_id:
+        self.get_logger().warning(f'Robot {robot_id} is not next in queue')
+        response.success = False
+        response.load = -1
+        return response
+    
+    print(f"Watering robot {robot_id} 💦💦🪴...")
+    
+    # Get water amount from queue
+    water_amount = self.robot_queue[0]['water_needed']
+    
+    # Simulate watering time
+    time.sleep(water_amount * self.secondsEnergy)
+    
+    # Remove robot from queue
+    self.robot_queue.pop(0)
+    
+    # Publish that plant was watered
+    planta_servida_msg = String()
+    planta_servida_msg.data = f"planta_regada_{robot_id}"
+    self.pub_planta_servida.publish(planta_servida_msg)
+    
+    print(f"Watering complete for robot {robot_id} 🔋🔋")
+    
+    response.success = True
+    return response
+
+Copy
+
+Insert at cursor
+python
+Add helper methods to manage the queue:
+
+def get_queue_status(self):
+    """
+    Returns current queue status
+    """
+    return {
+        'queue_length': len(self.robot_queue),
+        'current_queue': self.robot_queue
+    }
+
+def remove_from_queue(self, robot_id):
+    """
+    Removes a specific robot from queue
+    """
+    self.robot_queue = [r for r in self.robot_queue if r['id'] != robot_id]
+    self.get_logger().info(f'Removed robot {robot_id} from queue')
+
+Copy
+
+Insert at cursor
+python
+To use this queue system:
+
+Robots would first call the queue_watering service to get in line
+
+They would receive their queue position
+
+When it's their turn, they can call the recharge_water service
+
+If they try to get water out of turn, they'll be rejected
+
+You might also want to add:
+
+Maximum queue size
+
+Timeout for robots that don't show up for their turn
+
+Priority queue for emergency cases
+
+Queue position updates
+
+Here's how you could add these features:
+
+def __init__(self):
+    # ... existing init code ...
+    self.MAX_QUEUE_SIZE = 10
+    self.QUEUE_TIMEOUT = 300  # 5 minutes in seconds
+
+def check_queue_timeouts(self):
+    """
+    Remove timed-out robots from queue
+    """
+    current_time = time.time()
+    self.robot_queue = [
+        robot for robot in self.robot_queue 
+        if (current_time - robot['timestamp']) < self.QUEUE_TIMEOUT
+    ]
+
+def queue_service_callback(self, request, response):
+    # Add queue size check
+    if len(self.robot_queue) >= self.MAX_QUEUE_SIZE:
+        self.get_logger().warning('Queue is full')
+        response.success = False
+        response.load = -1
+        return response
+    
+    # Remove timed-out robots
+    self.check_queue_timeouts()
+    
+    # ... rest of existing queue_service_callback code ...
+
+ <model name="arlo_xolobot2">
+      <self_collide>false</self_collide>
+      <include merge="true">
+        <uri>package://xolobot_blueprint/models/arlodrive</uri>
+      </include>
+      <pose>0.95 0 0.06 0 0 0.0</pose>
+      <!-- <pose>0 0 0.01 0 0 1.570796</pose> -->
+      <!-- <pose>0 0 0.01 0 0 3.14159</pose> -->
+
+      <!-- <plugin
+        filename="libignition-gazebo-joint-state-publisher-system.so"
+        name="ignition::gazebo::systems::JointStatePublisher">
+      </plugin> -->
+
+      <plugin
+        filename="libignition-gazebo-pose-publisher-system.so"
+        name="ignition::gazebo::systems::PosePublisher">
+        <publish_link_pose>true</publish_link_pose>
+        <use_pose_vector_msg>true</use_pose_vector_msg>
+        <static_publisher>false</static_publisher>
+        <update_frequency>1</update_frequency>
+        <static_update_frequency>1</static_update_frequency>
+      </plugin>
+
+      <plugin
+        filename="libignition-gazebo-odometry-publisher-system.so"
+        name="ignition::gazebo::systems::OdometryPublisher">
+        <odom_frame>arlo_xolobot2/odom</odom_frame>
+        <robot_base_frame>arlo_xolobot2</robot_base_frame>
+        <odom_publish_frequency>20</odom_publish_frequency>
+        <odom_topic>/arlo_xolobot2/odom</odom_topic>
+      </plugin>
+    </model> 
+
+    <model name="kalanchoe2">
+      <self_collide>false</self_collide>
+      <pose>0.91 0 0.38 0 0 0</pose>
+      <include merge="true">
+        <uri>model://kalanchoe</uri>
+      </include>
+    </model>
