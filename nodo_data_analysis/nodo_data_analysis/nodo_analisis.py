@@ -15,6 +15,7 @@
 # Autor: Larios Vega Erick Efrain
 # Compilation: python3 nodo_analisis.py
 
+import sys # nueva biblioteca
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64
@@ -29,9 +30,9 @@ from kalanchoe_interface.msg import Measure
 
 class MinimalSubscriber(Node):
 
-    def __init__(self):
+    def __init__(self, plantID=1):
 
-        super().__init__('nodo_Analisis')
+        super().__init__('nodo_Analisis' + str(plantID))
 
         self.N = 10      # Numero de datos necesarios para promediar
         self.Hmin = 0.6  # Humedad minima para la planta
@@ -46,21 +47,22 @@ class MinimalSubscriber(Node):
         
         self.humidity_subscription = self.create_subscription(
             Measure,
-            '/humedad',
+            '/humedad' + str(plantID),
             self.updateHumidity,
             10)
         
         self.temperature_subscription = self.create_subscription(
             Measure,
-            '/temperatura',
+            '/temperatura' + str(plantID),
             self.updateTemperature,
             10)
         
         self.humidity_subscription
         self.temperature_subscription
 
-        self.riego_publisher = self.create_publisher(String, '/riego', 10)
-        self.sol_publisher = self.create_publisher(String, '/sol', 10)
+        self.riego_publisher = self.create_publisher(String, '/riego' + str(plantID), 10)
+        self.sol_publisher = self.create_publisher(String, '/sol' + str(plantID), 10)
+        print("El topico se llama /riego" + str(plantID))
 
 
     def updateHumidity(self, msg):
@@ -90,13 +92,9 @@ class MinimalSubscriber(Node):
                 self.riego_publisher.publish(String(data=str(average)))  # Publicar el promedio en el tópico 'riego'
                 self.get_logger().info('\nPromedio de humedad enviado a riego: "%f"\n' % average)
                 if self.audioNumber == 0:
-                    print("Tengo mucha sed")
-                    playsound('src/nodo_data_analysis/nodo_data_analysis/tengo_mucha_sed_m11.mp3')
-                    # playsound("tengo_mucha_sed_m11.mp3")  # Reproducir el archivo de audio
+                    playsound("src/nodo_data_analysis/nodo_data_analysis/tengo_mucha_sed_m11.mp3")  # Reproducir el archivo de audio
                 elif self.audioNumber == 1:
-                    print("Tengo sed")
-                    playsound('src/nodo_data_analysis/nodo_data_analysis/tengo_sed_m11.mp3')
-                    # playsound("tengo_sed_m11.mp3")
+                    playsound("src/nodo_data_analysis/nodo_data_analysis/tengo_sed_m11.mp3")
 
                 self.audioNumber = (self.audioNumber+1) % self.numAudioFiles
             self.humidity_data.clear()  # Limpiar la lista de datos de humedad
@@ -115,7 +113,8 @@ class MinimalSubscriber(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    minimal_subscriber = MinimalSubscriber()
+    id = int(sys.argv[1])
+    minimal_subscriber = MinimalSubscriber(id)
 
     try:
         rclpy.spin(minimal_subscriber)
